@@ -53,7 +53,7 @@ func TestMain(m *testing.M) {
 
 	defer func() {
 		// Cleanup namespace
-		teardownNamespace(clients, logger)
+		//teardownNamespace(clients, logger)
 		// Exit with m.Run exit code
 		os.Exit(code)
 	}()
@@ -75,7 +75,7 @@ func TestSimpleBuild(t *testing.T) {
 	buildName := "simple-build"
 
 	test.CleanupOnInterrupt(func() { teardownBuild(clients, logger, buildName) }, logger)
-	defer teardownBuild(clients, logger, buildName)
+	//defer teardownBuild(clients, logger, buildName)
 
 	if _, err := clients.buildClient.builds.Create(&v1alpha1.Build{
 		ObjectMeta: metav1.ObjectMeta{
