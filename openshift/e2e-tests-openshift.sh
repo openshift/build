@@ -4,13 +4,15 @@ source $(dirname $0)/../vendor/github.com/knative/test-infra/scripts/e2e-tests.s
 
 set -x
 
-export API_SERVER=$(oc config view --minify | grep server | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
-export USER=$KUBE_SSH_USER #satisfy e2e_flags.go#initializeFlags()
-export OPENSHIFT_REGISTRY=registry.svc.ci.openshift.org
-export TEST_NAMESPACE=build-tests
-export TEST_YAML_NAMESPACE=build-tests-yaml
-export BUILD_NAMESPACE=knative-build
-export IGNORES="git-volume"
+readonly ENABLE_ADMISSION_WEBHOOKS="${ENABLE_ADMISSION_WEBHOOKS:-"true"}"
+readonly API_SERVER=$(oc config view --minify | grep server | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
+readonly USER=$KUBE_SSH_USER #satisfy e2e_flags.go#initializeFlags()
+readonly OPENSHIFT_REGISTRY="${OPENSHIFT_REGISTRY:-"registry.svc.ci.openshift.org"}"
+readonly SSH_PRIVATE_KEY="${SSH_PRIVATE_KEY:-"$HOME/.ssh/google_compute_engine"}"
+readonly TEST_NAMESPACE=build-tests
+readonly TEST_YAML_NAMESPACE=build-tests-yaml
+readonly BUILD_NAMESPACE=knative-build
+readonly IGNORES="git-volume"
 
 env
 
@@ -20,8 +22,8 @@ function enable_admission_webhooks(){
   disable_strict_host_checking
   echo "API_SERVER=$API_SERVER"
   echo "KUBE_SSH_USER=$KUBE_SSH_USER"
-  chmod 600 ~/.ssh/google_compute_engine
-  echo "$API_SERVER ansible_ssh_private_key_file=~/.ssh/google_compute_engine" > inventory.ini
+  chmod 600 $SSH_PRIVATE_KEY
+  echo "$API_SERVER ansible_ssh_private_key_file=${SSH_PRIVATE_KEY}" > inventory.ini
   ansible-playbook ${REPO_ROOT_DIR}/openshift/admission-webhooks.yaml -i inventory.ini -u $KUBE_SSH_USER
   rm inventory.ini
 }
@@ -174,7 +176,9 @@ function teardown() {
   delete_build_openshift
 }
 
-enable_admission_webhooks
+if [[ $ENABLE_ADMISSION_WEBHOOKS == "true" ]]; then
+  enable_admission_webhooks
+fi
 
 create_test_namespace
 
