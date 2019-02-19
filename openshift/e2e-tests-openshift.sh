@@ -9,7 +9,7 @@ readonly OPENSHIFT_REGISTRY="${OPENSHIFT_REGISTRY:-"registry.svc.ci.openshift.or
 readonly TEST_NAMESPACE=build-tests
 readonly TEST_YAML_NAMESPACE=build-tests-yaml
 readonly BUILD_NAMESPACE=knative-build
-readonly IGNORES="git-volume"
+readonly IGNORES="git-volume|gcs-archive|docker-basic"
 
 env
 
@@ -35,7 +35,8 @@ function resolve_resources(){
   local dir=$1
   local resolved_file_name=$2
   local registry_prefix="$OPENSHIFT_REGISTRY/$OPENSHIFT_BUILD_NAMESPACE/stable"
-  for yaml in $(find $dir -name "*.yaml" | grep -v $IGNORES); do
+  > $resolved_file_name
+  for yaml in $(find $dir -name "*.yaml" | grep -vE $IGNORES); do
     echo "---" >> $resolved_file_name
     #first prefix all test images with "test-", then replace all image names with proper repository and prefix images with "knative-build-"
     sed -e 's%\(.* image: \)\(github.com\)\(.*\/\)\(test\/\)\(.*\)%\1\2 \3\4test-\5%' $yaml | \
