@@ -538,6 +538,7 @@ func TestBuildWithSources(t *testing.T) {
 // TestSimpleBuildWithHybridSources tests hybrid input sources can be accessed in all steps
 
 func TestSimpleBuildWithHybridSources(t *testing.T) {
+	t.Skip("https://issues.jboss.org/browse/OCF-392")
 	logger := logging.GetContextLogger("TestSimpleBuildWithHybridSources")
 	clients := buildClients(logger)
 
