@@ -76,7 +76,7 @@ function run_yaml_e2e_tests() {
   # Wait for tests to finish.
   echo ">> Waiting for tests to finish"
   local tests_finished=0
-    for i in {1..30}; do
+    for i in {1..60}; do
       sleep 10
       local finished="$(oc get builds.build.knative.dev --output=jsonpath='{.items[*].status.conditions[*].status}')"
       if [[ ! "$finished" == *"Unknown"* ]]; then
