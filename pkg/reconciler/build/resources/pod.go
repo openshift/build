@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 
 	v1alpha1 "github.com/knative/build/pkg/apis/build/v1alpha1"
@@ -258,6 +259,14 @@ func MakePod(build *v1alpha1.Build, kubeclient kubernetes.Interface) (*corev1.Po
 	}
 	annotations["sidecar.istio.io/inject"] = "false"
 
+	// Copy labels on the build through to the underlying pod to allow users
+	// to specify pod labels.
+	labels := map[string]string{}
+	for key, val := range build.Labels {
+		labels[key] = val
+	}
+	labels[buildNameLabelKey] = build.Name
+
 	cred, secrets, err := makeCredentialInitializer(build, kubeclient)
 	if err != nil {
 		return nil, err
@@ -306,12 +315,12 @@ func MakePod(build *v1alpha1.Build, kubeclient kubernetes.Interface) (*corev1.Po
 
 		// Add implicit volume mounts, unless the user has requested
 		// their own volume mount at that path.
-		requestedVolumeMounts := map[string]bool{}
+		requestedVolumeMounts := sets.NewString()
 		for _, vm := range step.VolumeMounts {
-			requestedVolumeMounts[filepath.Clean(vm.MountPath)] = true
+			requestedVolumeMounts.Insert(filepath.Clean(vm.MountPath))
 		}
 		for _, imp := range implicitVolumeMounts {
-			if !requestedVolumeMounts[filepath.Clean(imp.MountPath)] {
+			if !requestedVolumeMounts.Has(filepath.Clean(imp.MountPath)) {
 				// If the build's source specifies a subpath,
 				// use that in the implicit workspace volume
 				// mount.
@@ -341,12 +350,11 @@ func MakePod(build *v1alpha1.Build, kubeclient kubernetes.Interface) (*corev1.Po
 		return nil, err
 	}
 
-	// Add a unique suffix to avoid confusion when a build
-	// is deleted and re-created with the same name.
-	// We don't use GenerateName here because k8s fakes don't support it.
-	podName, err := GetUniquePodName(build.Name)
-	if err != nil {
-		return nil, err
+	var podName string
+	if build.Status.Cluster != nil && build.Status.Cluster.PodName != "" {
+		podName = build.Status.Cluster.PodName
+	} else {
+		return nil, fmt.Errorf("Can't create pod for build %q: pod name not set", build.Name)
 	}
 
 	return &corev1.Pod{
@@ -364,9 +372,7 @@ func MakePod(build *v1alpha1.Build, kubeclient kubernetes.Interface) (*corev1.Po
 				}),
 			},
 			Annotations: annotations,
-			Labels: map[string]string{
-				buildNameLabelKey: build.Name,
-			},
+			Labels:      labels,
 		},
 		Spec: corev1.PodSpec{
 			// If the build fails, don't restart it.

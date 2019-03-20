@@ -47,8 +47,8 @@ required = [
 
 [[override]]
   name = "github.com/knative/pkg"
-  # HEAD as of 2018-12-09
-  revision = "585076ba67e86ccbe9c2c146d49502d7433da7c0"
+  # HEAD as of 2019-02-14 💖
+  revision = "0183bf9cdc7349e3c76c26e51f84689b411fccea"
 
 [prune]
   go-tests = true

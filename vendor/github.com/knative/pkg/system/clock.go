@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Knative Authors
+Copyright 2019 The Knative Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resources
+package system
 
 import (
-	"github.com/knative/build/pkg/apis/build/v1alpha1"
-	buildtemplateresources "github.com/knative/build/pkg/reconciler/buildtemplate/resources"
-	caching "github.com/knative/caching/pkg/apis/caching/v1alpha1"
-	"github.com/knative/pkg/system"
+	"time"
 )
 
-func MakeImageCaches(bt *v1alpha1.ClusterBuildTemplate) []caching.Image {
-	return buildtemplateresources.MakeImageCachesFromSpec(system.Namespace(), bt)
+// Mockable interface for time based testing
+type Clock interface {
+	Now() time.Time
+}
+
+type RealClock struct{}
+
+func (RealClock) Now() time.Time {
+	return time.Now()
 }
