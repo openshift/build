@@ -1,56 +1,28 @@
-#!/bin/sh 
+#!/bin/sh
 
 source $(dirname $0)/../vendor/github.com/knative/test-infra/scripts/e2e-tests.sh
 
 set -x
 
-export API_SERVER=$(oc config view --minify | grep server | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
-export USER=$KUBE_SSH_USER #satisfy e2e_flags.go#initializeFlags()
-export OPENSHIFT_REGISTRY=registry.svc.ci.openshift.org
-export TEST_NAMESPACE=build-tests
-export TEST_YAML_NAMESPACE=build-tests-yaml
-export BUILD_NAMESPACE=knative-build
-export IGNORES="git-volume"
+readonly API_SERVER=$(oc config view --minify | grep server | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
+readonly OPENSHIFT_REGISTRY="${OPENSHIFT_REGISTRY:-"registry.svc.ci.openshift.org"}"
+readonly TEST_NAMESPACE=build-tests
+readonly TEST_YAML_NAMESPACE=build-tests-yaml
+readonly BUILD_NAMESPACE=knative-build
+readonly IGNORES="git-volume|gcs-archive|docker-basic"
 
 env
-
-function enable_admission_webhooks(){
-  header "Enabling admission webhooks"
-  add_current_user_to_etc_passwd
-  disable_strict_host_checking
-  echo "API_SERVER=$API_SERVER"
-  echo "KUBE_SSH_USER=$KUBE_SSH_USER"
-  chmod 600 ~/.ssh/google_compute_engine
-  echo "$API_SERVER ansible_ssh_private_key_file=~/.ssh/google_compute_engine" > inventory.ini
-  ansible-playbook ${REPO_ROOT_DIR}/openshift/admission-webhooks.yaml -i inventory.ini -u $KUBE_SSH_USER
-  rm inventory.ini
-}
-
-function add_current_user_to_etc_passwd(){
-  if ! whoami &>/dev/null; then
-    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-  fi
-  cat /etc/passwd
-}
-
-function disable_strict_host_checking(){
-  cat >> ~/.ssh/config <<EOF
-Host *
-   StrictHostKeyChecking no
-   UserKnownHostsFile=/dev/null
-EOF
-}
 
 function install_build(){
   header "Installing Knative Build"
   # Grant the necessary privileges to the service accounts Knative will use:
   oc adm policy add-scc-to-user anyuid -z build-controller -n knative-build
   oc adm policy add-cluster-role-to-user cluster-admin -z build-controller -n knative-build
-  
+
   create_build
 
   wait_until_pods_running $BUILD_NAMESPACE || return 1
-  
+
   header "Knative Build Installed successfully"
 }
 
@@ -63,7 +35,8 @@ function resolve_resources(){
   local dir=$1
   local resolved_file_name=$2
   local registry_prefix="$OPENSHIFT_REGISTRY/$OPENSHIFT_BUILD_NAMESPACE/stable"
-  for yaml in $(find $dir -name "*.yaml" | grep -v $IGNORES); do
+  > $resolved_file_name
+  for yaml in $(find $dir -name "*.yaml" | grep -vE $IGNORES); do
     echo "---" >> $resolved_file_name
     #first prefix all test images with "test-", then replace all image names with proper repository and prefix images with "knative-build-"
     sed -e 's%\(.* image: \)\(github.com\)\(.*\/\)\(test\/\)\(.*\)%\1\2 \3\4test-\5%' $yaml | \
@@ -104,7 +77,7 @@ function run_yaml_e2e_tests() {
   # Wait for tests to finish.
   echo ">> Waiting for tests to finish"
   local tests_finished=0
-    for i in {1..30}; do
+    for i in {1..60}; do
       sleep 10
       local finished="$(oc get builds.build.knative.dev --output=jsonpath='{.items[*].status.conditions[*].status}')"
       if [[ ! "$finished" == *"Unknown"* ]]; then
@@ -173,8 +146,6 @@ function teardown() {
   delete_test_resources_openshift
   delete_build_openshift
 }
-
-enable_admission_webhooks
 
 create_test_namespace
 
