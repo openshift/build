@@ -23,11 +23,7 @@ source $(dirname $0)/e2e-common.sh
 
 header "Setting up environment"
 
-# Handle failures ourselves, so we can dump useful info.
-set +o errexit
-set +o pipefail
-
-install_pipeline_crd
+knative_setup
 
 # Run the tests
 
