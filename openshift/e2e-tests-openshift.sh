@@ -46,6 +46,7 @@ function resolve_resources(){
     sed -e 's%github.com/knative/build/cmd/git-init%'"$registry_prefix"'\:knative-build-git-init%g' | \
     sed -e 's%github.com/knative/build/cmd/nop%'"$registry_prefix"'\:knative-build-nop%g' \
     >> $resolved_file_name
+    echo >> $resolved_file_name
   done
 }
 
@@ -58,7 +59,7 @@ function create_test_namespace(){
 
 function run_go_e2e_tests(){
   header "Running Go e2e tests"
-  go_test_e2e ./test/e2e/... --kubeconfig $KUBECONFIG || return 1
+  go_test_e2e ./test/e2e/... -timeout=20m --kubeconfig $KUBECONFIG || return 1
 }
 
 function run_yaml_e2e_tests() {
