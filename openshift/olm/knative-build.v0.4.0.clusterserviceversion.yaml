@@ -195,7 +195,7 @@ spec:
               serviceAccountName: build-controller
               containers:
                 - name: knative-build-operator
-                  image: quay.io/jcrossley3/knative-build-operator:0.4.0
+                  image: quay.io/openshift-knative/knative-build-operator:v0.4.0
                   command:
                   - knative-build-operator
                   args:
