@@ -268,12 +268,13 @@ data:
                 - update
               - apiGroups:
                 - policy
-                resourceNames:
-                - knative-build
                 resources:
                 - podsecuritypolicies
                 verbs:
-                - '*'
+                - create
+                - update
+                - patch
+                - get
               - apiGroups:
                 - build.knative.dev
                 resources:
