@@ -161,6 +161,7 @@ spec:
           - podsecuritypolicies
           verbs:
           - create
+          - update
           - patch
           - get
         - apiGroups:
