@@ -513,6 +513,8 @@ func TestBuildWithSources(t *testing.T) {
 
 // TestSimpleBuildWithHybridSources tests hybrid input sources can be accessed in all steps
 func TestSimpleBuildWithHybridSources(t *testing.T) {
+	// FIXME(vdemeester) add a skip mechanism upstream
+	t.Skip("Doesn't work on openshift CI — depends on GCS")
 	buildTestNamespace, clients := initialize(t)
 
 	buildName := "hybrid-sources"
