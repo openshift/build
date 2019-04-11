@@ -107,7 +107,7 @@ this PR is merged, the CI setup for that branch is active.
 3. Build/test the operator
 4. Commit the source
 5. `export VERSION="vX.Y.Z"        # replace X.Y.Z as appropriate`
-6.. `operator-sdk build --docker-build-args "--build-arg version=$VERSION" quay.io/openshift-knative/$OPERATOR_NAME:$VERSION`
+6.. `operator-sdk build quay.io/openshift-knative/$OPERATOR_NAME:$VERSION`
 7. `docker push quay.io/openshift-knative/$OPERATOR_NAME:$VERSION`
 8. `git tag $VERSION; git push --tags`
 
@@ -123,7 +123,7 @@ this PR is merged, the CI setup for that branch is active.
 ```NAME=knative-serving \
 DIR=openshift/olm \
 ~/src/knative-operators/etc/scripts/catalog.sh \
-> openshift/olm/knative-serving.catalogsource.yaml
+> openshift/olm/knative-build.catalogsource.yaml
 ```
 
 #### Tag the repository
