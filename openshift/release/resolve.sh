@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-readonly IGNORES="${IGNORES:-"^[ \t]*$"}" # By default no ignores
+IGNORES="${IGNORES:-"^[ \t]*$"}" # By default no ignores
 
 function resolve_resources(){
   local dir=$1
@@ -29,5 +29,6 @@ function resolve_resources(){
         -e '/^[ \t]*#/d' \
         -e '/^[ \t]*$/d' \
         "$yaml" >> $resolved_file_name
+    echo >> $resolved_file_name
   done
 }
