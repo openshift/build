@@ -19,6 +19,10 @@ env
 
 function install_build(){
   header "Installing Knative Build"
+  
+  # Create knative-build namespace, needed for imagestreams
+  oc create namespace $BUILD_NAMESPACE
+  
   # Grant the necessary privileges to the service accounts Knative will use:
   oc adm policy add-scc-to-user anyuid -z build-controller -n knative-build
   oc adm policy add-cluster-role-to-user cluster-admin -z build-controller -n knative-build
