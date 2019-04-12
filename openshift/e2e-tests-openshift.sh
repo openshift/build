@@ -24,8 +24,8 @@ function install_build(){
   oc create namespace $BUILD_NAMESPACE
   
   # Grant the necessary privileges to the service accounts Knative will use:
-  oc adm policy add-scc-to-user anyuid -z build-controller -n knative-build
-  oc adm policy add-cluster-role-to-user cluster-admin -z build-controller -n knative-build
+  oc adm policy add-scc-to-user anyuid -z build-controller -n $BUILD_NAMESPACE
+  oc adm policy add-cluster-role-to-user cluster-admin -z build-controller -n $BUILD_NAMESPACE
 
   create_build
 
@@ -45,8 +45,6 @@ function create_build(){
 function tag_images(){
   local resolved_file_name=$1
 
-  oc policy add-role-to-group system:image-puller system:serviceaccounts:${BUILD_NAMESPACE} --namespace=${OPENSHIFT_BUILD_NAMESPACE}
-
   echo ">> Creating imagestream tags for images referenced in yaml files"
   IMAGE_NAMES=$(cat $resolved_file_name | grep -i "image:" | grep "$INTERNAL_REGISTRY" | awk '{print $2}' | awk -F '/' '{print $3}')
   for name in $IMAGE_NAMES; do
@@ -62,9 +60,9 @@ function tag_built_image() {
 
 function create_test_namespace(){
   oc new-project $TEST_YAML_NAMESPACE
-  oc policy add-role-to-group system:image-puller system:serviceaccounts:$TEST_YAML_NAMESPACE -n $OPENSHIFT_BUILD_NAMESPACE
+  oc policy add-role-to-group system:image-puller system:serviceaccounts:$TEST_YAML_NAMESPACE -n $BUILD_NAMESPACE
   oc new-project $TEST_NAMESPACE
-  oc policy add-role-to-group system:image-puller system:serviceaccounts:$TEST_NAMESPACE -n $OPENSHIFT_BUILD_NAMESPACE
+  oc policy add-role-to-group system:image-puller system:serviceaccounts:$TEST_NAMESPACE -n $BUILD_NAMESPACE
 }
 
 function run_go_e2e_tests(){
@@ -145,9 +143,9 @@ function delete_test_resources_openshift() {
 
  function delete_test_namespace(){
    echo ">> Deleting test namespace $TEST_NAMESPACE"
-   oc policy remove-role-from-group system:image-puller system:serviceaccounts:$TEST_NAMESPACE -n $OPENSHIFT_BUILD_NAMESPACE
+   oc policy remove-role-from-group system:image-puller system:serviceaccounts:$TEST_NAMESPACE -n $BUILD_NAMESPACE
    oc delete project $TEST_NAMESPACE
-   oc policy remove-role-from-group system:image-puller system:serviceaccounts:$TEST_YAML_NAMESPACE -n $OPENSHIFT_BUILD_NAMESPACE
+   oc policy remove-role-from-group system:image-puller system:serviceaccounts:$TEST_YAML_NAMESPACE -n $BUILD_NAMESPACE
    oc delete project $TEST_YAML_NAMESPACE
  }
 
@@ -157,15 +155,15 @@ function teardown() {
   delete_build_openshift
 }
 
-create_test_namespace
-
-install_build
+create_test_namespace || exit 1
 
 failed=0
 
-run_go_e2e_tests || failed=1
+install_build || failed=1
 
-run_yaml_e2e_tests || failed=1
+(( !failed )) && run_go_e2e_tests || failed=1
+
+(( !failed )) && run_yaml_e2e_tests || failed=1
 
 (( failed )) && dump_cluster_state
 
