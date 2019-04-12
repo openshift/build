@@ -24,3 +24,8 @@ generate-dockerfiles:
 	./openshift/ci-operator/generate-dockerfiles.sh openshift/ci-operator/Dockerfile-git.in openshift/ci-operator/knative-images $(CORE_IMAGES_WITH_GIT)
 	./openshift/ci-operator/generate-dockerfiles.sh openshift/ci-operator/Dockerfile.in openshift/ci-operator/knative-test-images $(TEST_IMAGES)
 .PHONY: generate-dockerfiles
+
+# Generate an aggregated knative yaml file with replaced image references
+generate-release:
+	./openshift/release/generate-release.sh $(RELEASE)
+.PHONY: generate-release
