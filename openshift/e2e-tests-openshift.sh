@@ -8,6 +8,7 @@ set -x
 readonly API_SERVER=$(oc config view --minify | grep server | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
 readonly OPENSHIFT_REGISTRY="${OPENSHIFT_REGISTRY:-"registry.svc.ci.openshift.org"}"
 readonly INTERNAL_REGISTRY="${INTERNAL_REGISTRY:-"image-registry.openshift-image-registry.svc:5000"}"
+readonly INSECURE="${INSECURE:-"false"}"
 readonly TEST_NAMESPACE=build-tests
 readonly TEST_YAML_NAMESPACE=build-tests-yaml
 readonly BUILD_NAMESPACE=knative-build
