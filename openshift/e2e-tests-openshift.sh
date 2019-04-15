@@ -1,23 +1,31 @@
 #!/bin/sh
 
 source $(dirname $0)/../vendor/github.com/knative/test-infra/scripts/e2e-tests.sh
+source $(dirname $0)/release/resolve.sh
 
 set -x
 
 readonly API_SERVER=$(oc config view --minify | grep server | awk -F'//' '{print $2}' | awk -F':' '{print $1}')
 readonly OPENSHIFT_REGISTRY="${OPENSHIFT_REGISTRY:-"registry.svc.ci.openshift.org"}"
+readonly INTERNAL_REGISTRY="${INTERNAL_REGISTRY:-"image-registry.openshift-image-registry.svc:5000"}"
+readonly INSECURE="${INSECURE:-"false"}"
 readonly TEST_NAMESPACE=build-tests
 readonly TEST_YAML_NAMESPACE=build-tests-yaml
 readonly BUILD_NAMESPACE=knative-build
+readonly TARGET_IMAGE_PREFIX="$INTERNAL_REGISTRY/$BUILD_NAMESPACE/knative-build-"
 readonly IGNORES="git-volume|gcs-archive|docker-basic"
 
 env
 
 function install_build(){
   header "Installing Knative Build"
+  
+  # Create knative-build namespace, needed for imagestreams
+  oc create namespace $BUILD_NAMESPACE
+  
   # Grant the necessary privileges to the service accounts Knative will use:
-  oc adm policy add-scc-to-user anyuid -z build-controller -n knative-build
-  oc adm policy add-cluster-role-to-user cluster-admin -z build-controller -n knative-build
+  oc adm policy add-scc-to-user anyuid -z build-controller -n $BUILD_NAMESPACE
+  oc adm policy add-cluster-role-to-user cluster-admin -z build-controller -n $BUILD_NAMESPACE
 
   create_build
 
@@ -27,34 +35,33 @@ function install_build(){
 }
 
 function create_build(){
-  resolve_resources config/ build-resolved.yaml
+  resolve_resources config/ build-resolved.yaml $TARGET_IMAGE_PREFIX
+
+  tag_images build-resolved.yaml
+
   oc apply -f build-resolved.yaml
 }
 
-function resolve_resources(){
-  local dir=$1
-  local resolved_file_name=$2
-  local registry_prefix="$OPENSHIFT_REGISTRY/$OPENSHIFT_BUILD_NAMESPACE/stable"
-  > $resolved_file_name
-  for yaml in $(find $dir -name "*.yaml" | grep -vE $IGNORES); do
-    echo "---" >> $resolved_file_name
-    #first prefix all test images with "test-", then replace all image names with proper repository and prefix images with "knative-build-"
-    sed -e 's%\(.* image: \)\(github.com\)\(.*\/\)\(test\/\)\(.*\)%\1\2 \3\4test-\5%' $yaml | \
-    sed -e 's%\(.* image: \)\(github.com\)\(.*\/\)\(.*\)%\1 '"$registry_prefix"'\:knative-build-\4%' | \
-    # process these images separately as they're passed as arguments to other containers
-    sed -e 's%github.com/knative/build/cmd/creds-init%'"$registry_prefix"'\:knative-build-creds-init%g' | \
-    sed -e 's%github.com/knative/build/cmd/git-init%'"$registry_prefix"'\:knative-build-git-init%g' | \
-    sed -e 's%github.com/knative/build/cmd/nop%'"$registry_prefix"'\:knative-build-nop%g' \
-    >> $resolved_file_name
-    echo >> $resolved_file_name
+function tag_images(){
+  local resolved_file_name=$1
+
+  oc policy add-role-to-group system:image-puller system:authenticated --namespace=$BUILD_NAMESPACE
+
+  echo ">> Creating imagestream tags for images referenced in yaml files"
+  IMAGE_NAMES=$(cat $resolved_file_name | grep -i "image:" | grep "$INTERNAL_REGISTRY" | awk '{print $2}' | awk -F '/' '{print $3}')
+  for name in $IMAGE_NAMES; do
+    tag_built_image ${name} ${name}
   done
+}
+
+function tag_built_image() {
+  local remote_name=$1
+  local local_name=$2
+  oc tag --insecure=${INSECURE} -n ${BUILD_NAMESPACE} ${OPENSHIFT_REGISTRY}/${OPENSHIFT_BUILD_NAMESPACE}/stable:${remote_name} ${local_name}:latest
 }
 
 function create_test_namespace(){
   oc new-project $TEST_YAML_NAMESPACE
-  oc policy add-role-to-group system:image-puller system:serviceaccounts:$TEST_YAML_NAMESPACE -n $OPENSHIFT_BUILD_NAMESPACE
-  oc new-project $TEST_NAMESPACE
-  oc policy add-role-to-group system:image-puller system:serviceaccounts:$TEST_NAMESPACE -n $OPENSHIFT_BUILD_NAMESPACE
 }
 
 function run_go_e2e_tests(){
@@ -65,7 +72,10 @@ function run_go_e2e_tests(){
 function run_yaml_e2e_tests() {
   header "Running YAML e2e tests"
   oc project $TEST_YAML_NAMESPACE
-  resolve_resources test/ tests-resolved.yaml
+  resolve_resources test/ tests-resolved.yaml $TARGET_IMAGE_PREFIX
+
+  tag_images tests-resolved.yaml
+
   oc apply -f tests-resolved.yaml
 
   # The rest of this function copied from test/e2e-common.sh#run_yaml_tests()
@@ -132,27 +142,24 @@ function delete_test_resources_openshift() {
 
  function delete_test_namespace(){
    echo ">> Deleting test namespace $TEST_NAMESPACE"
-   oc policy remove-role-from-group system:image-puller system:serviceaccounts:$TEST_NAMESPACE -n $OPENSHIFT_BUILD_NAMESPACE
-   oc delete project $TEST_NAMESPACE
-   oc policy remove-role-from-group system:image-puller system:serviceaccounts:$TEST_YAML_NAMESPACE -n $OPENSHIFT_BUILD_NAMESPACE
    oc delete project $TEST_YAML_NAMESPACE
  }
 
 function teardown() {
-  delete_test_namespace
   delete_test_resources_openshift
+  delete_test_namespace
   delete_build_openshift
 }
 
-create_test_namespace
-
-install_build
-
 failed=0
 
-run_go_e2e_tests || failed=1
+install_build || failed=1
 
-run_yaml_e2e_tests || failed=1
+(( !failed )) && create_test_namespace || failed=1
+
+(( !failed )) && run_go_e2e_tests || failed=1
+
+(( !failed )) && run_yaml_e2e_tests || failed=1
 
 (( failed )) && dump_cluster_state
 
