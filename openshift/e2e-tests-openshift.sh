@@ -155,11 +155,11 @@ function teardown() {
   delete_build_openshift
 }
 
-create_test_namespace || exit 1
-
 failed=0
 
 install_build || failed=1
+
+(( !failed )) && create_test_namespace || failed=1
 
 (( !failed )) && run_go_e2e_tests || failed=1
 
