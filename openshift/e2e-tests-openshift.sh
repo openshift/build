@@ -45,6 +45,8 @@ function create_build(){
 function tag_images(){
   local resolved_file_name=$1
 
+  oc policy add-role-to-group system:image-puller system:authenticated --namespace=$BUILD_NAMESPACE
+
   echo ">> Creating imagestream tags for images referenced in yaml files"
   IMAGE_NAMES=$(cat $resolved_file_name | grep -i "image:" | grep "$INTERNAL_REGISTRY" | awk '{print $2}' | awk -F '/' '{print $3}')
   for name in $IMAGE_NAMES; do
@@ -60,9 +62,6 @@ function tag_built_image() {
 
 function create_test_namespace(){
   oc new-project $TEST_YAML_NAMESPACE
-  oc policy add-role-to-group system:image-puller system:serviceaccounts:$TEST_YAML_NAMESPACE -n $BUILD_NAMESPACE
-  oc new-project $TEST_NAMESPACE
-  oc policy add-role-to-group system:image-puller system:serviceaccounts:$TEST_NAMESPACE -n $BUILD_NAMESPACE
 }
 
 function run_go_e2e_tests(){
@@ -143,15 +142,12 @@ function delete_test_resources_openshift() {
 
  function delete_test_namespace(){
    echo ">> Deleting test namespace $TEST_NAMESPACE"
-   oc policy remove-role-from-group system:image-puller system:serviceaccounts:$TEST_NAMESPACE -n $BUILD_NAMESPACE
-   oc delete project $TEST_NAMESPACE
-   oc policy remove-role-from-group system:image-puller system:serviceaccounts:$TEST_YAML_NAMESPACE -n $BUILD_NAMESPACE
    oc delete project $TEST_YAML_NAMESPACE
  }
 
 function teardown() {
-  delete_test_namespace
   delete_test_resources_openshift
+  delete_test_namespace
   delete_build_openshift
 }
 
